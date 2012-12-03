@@ -1,0 +1,54 @@
+{{left_sidebar_enabled,right_sidebar_enabled=False,False}}
+{{extend 'layout.html'}}
+    <script>
+      // ensure the web page (DOM) has loaded
+      document.addEventListener("DOMContentLoaded", function () {
+
+         // Create a popcorn instance by calling Popcorn("#id-of-my-video")
+         var pop = Popcorn("#ourvideo");
+
+         // add a footnote at 2 seconds, and remove it at 6 seconds
+         pop.footnote({
+           start: 2,
+           end: 6,
+           text: "Pop!",
+           target: "footnotediv"
+         });
+
+{{for slide in slides:}}
+ pop.image({
+     // seconds
+    start: {{=slide.get('start', 0)}},
+    // seconds
+    end: {{=slide.get('end', 0)}},
+    href: "{{=slide.get('href', "")}}",
+    src: "{{=slide.get('src', "")}}",
+    text: "{{=slide.get('text', "")}}",
+    target: "{{=slide.get('target', "slides")}}",
+    });
+{{pass}}
+
+{{for subtitle in subtitles:}}
+     pop.subtitle({
+       start: {{=subtitle.get('start', 0)}},
+       end: {{=subtitle.get('end', 0)}},
+       text: "{{=subtitle.get('text', "")}}",
+     });
+{{pass}}
+         // play the video right away
+         //pop.play();
+
+      }, false);
+    </script>
+  </head>
+  <body>
+    <div id="video" style="position: absolute; top: auto; left: auto; float: left; width: 426px; height: 240px;">
+        <video height="240" width="426" id="ourvideo" controls  >
+        {{for video in videos:}}
+          <source src="{{=video}}"></source>
+        {{pass}}
+        </video>
+       <div id="footnotediv"  style="width: 426px; height: 150px"></div>
+
+    </div>
+    <div id="slides" style="float: right; width: 500px; height: 375px;"></div>

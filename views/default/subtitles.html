@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+<h1>{{=T("Subtitles")}}</h1>
+<ul>
+{{for subtitle in subtitles:}}
+<li>{{=A(subtitle.text, _href=URL('subtitles', args=(video.id, subtitle.id)))}}</li>
+{{pass}}
+</ul>
+{{=form}}

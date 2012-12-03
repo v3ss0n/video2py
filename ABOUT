@@ -1,0 +1,6 @@
+HTML5 video mashup application specially designed for conference talks, tutorials, screencasts and interview.
+Supports video, presentation (slide images), subtitles and footnotes.
+
+
+Developed with web2py.
+Copyright 2012 Mariano Reingart <reingart@gmail.com>

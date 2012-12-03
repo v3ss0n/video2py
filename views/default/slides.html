@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+<h1>{{=T("Slides")}}</h1>
+<ul>
+{{for slide in slides:}}
+<li>{{=A(slide.title, _href=URL('slides', args=(video.id, slide.id)))}}</li>
+{{pass}}
+</ul>
+{{=form}}

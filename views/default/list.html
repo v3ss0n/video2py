@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+<h1>{{=T("Videos")}}</h1>
+<ul>
+{{for video in videos:}}
+<li>{{=A(video.title, _href=URL('edit', args=(video.id)))}}</li>
+{{pass}}
+</ul>
+{{=A(T("new"), _href=URL('edit'))}}
