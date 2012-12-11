@@ -1,55 +1,12 @@
-{{left_sidebar_enabled,right_sidebar_enabled=False,False}}
 {{extend 'layout.html'}}
-    <script>
-      // ensure the web page (DOM) has loaded
-      document.addEventListener("DOMContentLoaded", function () {
+{{=H3(T("Show video"))}}
+{{=H5(video.title)}}
+{{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+             _id="ourvideo"),
+       _id="video")}}
 
-         // Create a popcorn instance by calling Popcorn("#id-of-my-video")
-         var pop = Popcorn("#ourvideo");
+{{=SCRIPT("""
+jQuery(document).ready(function(){
+var pop = Popcorn("#ourvideo");
+});""", _type="text/javascript")}}
 
-{{for footnote in footnotes:}}
-         pop.footnote({
-           start: {{=footnote.get('start', 0)}},
-           end: {{=footnote.get('end', 0)}},
-           text: "{{=footnote.get('text', "")}}",
-           target: "{{=footnote.get('target', "footnotediv")}}",
-         });
-{{pass}}
-          
-{{for slide in slides:}}
-     pop.image({
-         // seconds
-        start: {{=slide.get('start', 0)}},
-        // seconds
-        end: {{=slide.get('end', 0)}},
-        href: "{{=slide.get('href', "")}}",
-        src: "{{=slide.get('src', "")}}",
-        text: "{{=slide.get('title', "")}}",
-        target: "{{=slide.get('target', "slides")}}",
-        });
-{{pass}}
-
-{{for subtitle in subtitles:}}
-     pop.subtitle({
-       start: {{=subtitle.get('start', 0)}},
-       end: {{=subtitle.get('end', 0)}},
-       text: "{{=subtitle.get('text', "")}}",
-     });
-{{pass}}
-         // play the video right away
-         //pop.play();
-
-      }, false);
-    </script>
-  </head>
-  <body>
-    <div id="video" style="position: absolute; top: auto; left: auto; float: left; width: 426px; height: 240px;">
-        <video height="240" width="426" id="ourvideo" controls  >
-        {{for src in sources:}}
-          <source src="{{=src}}"></source>
-        {{pass}}
-        </video>
-       <div id="footnotediv"  style="width: 426px; height: 150px"></div>
-
-    </div>
-    <div id="slides" style="float: right; width: 500px; height: 375px;"></div>

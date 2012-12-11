@@ -9,11 +9,21 @@
 ## - call exposes all registered services (none by default)
 #########################################################################
 
+if auth.is_logged_in() and (not session.options):
+    USER_OPTIONS = db(db.option.user_id==auth.user_id).select().first()
+    if USER_OPTIONS is not None:
+        session.options = USER_OPTIONS.as_dict()
+    else:
+        session.options = {"subtitle_language": None, "subtitle_time": 3}
+
+if request.function in ["show", "subtitles", "slides"]:
+    response.files.append(URL(c='static', f="js/popcorn_complete.js"))
+
 def index():
     """
     example action using the internationalization operator T and flash
     rendered by views/default/index.html or views/generic.html
-    """
+
     response.flash = "Welcome to web2py!"
     response.files.append(URL(c='static',f="js/popcorn_complete.js"))
     video = "2012_11_16_10_49_42_00194_480p_60s"
@@ -33,106 +43,68 @@ def index():
          'start': i*3,
          'end': i*3+3,
          }  for i in range(15)]
-    return dict(videos=videos, slides=slides, subtitles=subtitles )
-
-def list():
+    return dict(videos=videos, slides=slides, subtitles=subtitles)
+    """
     videos = db(db.video).select()
     return dict(videos=videos)
 
-def edit():
-    if request.args:
-        video = db(db.video.id==request.args[0]).select().first()
+@auth.requires_login()
+def slides():
+    video = db.video[request.args(1)]
+    sources = db(db.source.video_id==request.args(1)).select()
+    slides = db(db.slide.video_id==request.args(1)).select()
+    return dict(video=video, sources=sources, slides=slides)
+
+@auth.requires_login()
+def subtitles():
+    video = db.video[request.args(1)]
+    sources = db(db.source.video_id==request.args(1)).select()
+
+    sq = db.subtitulation.user_id == auth.user_id
+    sq &= db.subtitulation.video_id == request.args(1)
+    sq &= db.subtitulation.language == session.options["subtitle_language"]
+    subtitulation = db(sq).select().first()
+    mylanguage = session.options["subtitle_language"]
+
+    if subtitulation is None:
+        subtitulation_id = db.subtitulation.insert(user_id=auth.user_id,
+                                                   video_id=request.args(1),
+                                                   language=mylanguage)
+
+        # Fill subtitulation with previous subtitles
+        other_subs = db((db.subtitulation.video_id==request.args(1)) & \
+                        (db.subtitulation.language==mylanguage) & \
+                        (db.subtitulation.id!=subtitulation_id)).select()
+        sub_qties = dict()
+
+        for osub in other_subs:
+            subcount = db(db.subtitle.subtitulation_id==osub.id).count()
+            sub_qties[subcount] = osub.id
+
+        if len(sub_qties) > 0:
+            other_subs_id = sub_qties[max(sub_qties)]
+            other_subtitles = db(db.subtitle.subtitulation_id==other_subs_id).select()
+            for other_subtitle in other_subtitles:
+                osad = other_subtitle.as_dict()
+                del(osad["id"])
+                del(osad["subtitulation_id"])
+                osad["subtitulation_id"] = subtitulation_id
+                db.subtitle.insert(**osad)
+        else:
+            # This is the first subtitulation for this language
+            # set as default
+            db.subtitulation[subtitulation_id].update_record(auto=True)
     else:
-        video = None
-    form = SQLFORM(db.video, video)
-    if form.accepts(request.vars, session):
-        response.flash = "ok"
-    elif form.errors:
-        response.flash = "err!"
-    return dict(form=form)
+        subtitulation_id = subtitulation.id
+
+    subtitles = db(db.subtitle.subtitulation_id==subtitulation_id).select()
+    return dict(video=video, sources=sources, subtitles=subtitles,
+                subtitulation=subtitulation_id)
 
 def show():
-    response.files.append(URL(c='static',f="js/popcorn_complete.js"))
-
-    debug = request.vars['debug'] and True or False
-
-    video = db(db.video.id==request.args[0]).select().first()
-    response.title = video.title
-
-    sources = [URL(c='static',f="videos/%s%s" % (video.src, ext))
-               for ext in ('_fast.mp4', '.webm', '.ogv')]
-
-    footnotes = [{
-         'text': video.summary.replace("\n"," ").replace("\r"," "),
-         'start': 0,
-         'end': 1,
-         }]
-
-    slides = []
-    for slide in db(db.slide.video_id==video.id).select(orderby=db.slide.start):
-        #TODO: calculate slide time looking at the next one
-        start = (slide.start.second + slide.start.minute*60) if slide.start else -1
-        end = (slide.end.second + slide.end.minute*60) if slide.end else -1
-        slides.append({'href': '',
-           'src': URL('download',args=slide.image),
-           'text': 'slide %d' % slide.id if debug else '',
-           'start': start,
-           'end': end,
-         })
-        if slide.text:
-            footnotes.append({
-             'text': slide.text.replace("\n"," ").replace("\r"," "),
-             'start': start,
-             'end': end,
-             })
-    subtitles = []
-    for subtitle in db(db.subtitle.video_id==video.id).select(orderby=db.subtitle.start):
-        start = (subtitle.start.second + subtitle.start.minute*60) if subtitle.start else -1
-        end = (subtitle.end.second + subtitle.end.minute*60) if subtitle.end else -1
-        subtitles.append({'text': subtitle.text,
-         'start': start,
-         'end': end,
-         })
-    return dict(sources=sources, slides=slides, subtitles=subtitles, footnotes=footnotes)
-
-def slides():
-    "Simple CRUD for slides"
-    # TODO 1: upload a PDF, convert it to jpg and move the images to static
-    # ie: "convert -density 96 flask-pycon_2012.pdf flask-pycon_2012.png"
-    # TODO 2: better sync of slides using pop.currentTime()
-    video = db(db.video.id==request.args[0]).select().first()
-    response.title = video.title
-    db.slide.video_id.default = video.id
-    if len(request.args)>1:
-        slide = db(db.slide.id==request.args[1]).select().first()
-    else:
-        slide = None
-    form = SQLFORM(db.slide, slide)
-    if form.accepts(request.vars, session):
-        response.flash = "ok"
-    elif form.errors:
-        response.flash = "err!"
-    slides = db(db.slide.video_id==video.id).select()
-    return dict(slides=slides, video=video, form=form)
-
-def subtitles():
-    "Simple CRUD for subtitles"
-    # TODO 1: support uploading a SRT or similar
-    # TODO 2: better sync of subtitles using pop.currentTime()
-    video = db(db.video.id==request.args[0]).select().first()
-    response.title = video.title
-    db.subtitle.video_id.default = video.id
-    if len(request.args)>1:
-        subtitle = db(db.subtitle.id==request.args[1]).select().first()
-    else:
-        subtitle = None
-    form = SQLFORM(db.subtitle, subtitle)
-    if form.accepts(request.vars, session):
-        response.flash = "ok"
-    elif form.errors:
-        response.flash = "err!"
-    subtitles = db(db.subtitle.video_id==video.id).select()
-    return dict(subtitles=subtitles, video=video, form=form)
+    video = db.video[request.args(1)]
+    sources = db(db.source.video_id==request.args(1)).select()
+    return dict(video=video, sources=sources)
 
 def user():
     """
@@ -185,3 +157,77 @@ def data():
       LOAD('default','data.load',args='tables',ajax=True,user_signature=True)
     """
     return dict(form=crud())
+
+
+@auth.requires_login()
+def setup():
+    messages = UL()
+    managers = db(db.auth_group.role=="manager").select().first()
+    if managers is None:
+        managers_id = db.auth_group.insert(role="manager")
+        manager_id = db.auth_membership.insert(user_id=auth.user_id, group_id=managers_id)
+        messages.append(LI("You've been added to the managers group"))
+    if auth.has_membership(role="manager"):
+        videos_form = SQLFORM.factory()
+        videos_form.element("[type=submit]").attributes["_value"] = T("Update videos")
+        if videos_form.process(formname="videos_form").accepted:
+            messages.append(LI(T("Added %s videos") % setup_videos()))
+    else:
+        videos_form = None
+    options = db(db.option.user_id==auth.user_id).select().first()
+    if options is None:
+        options_id = db.option.insert(user_id=auth.user_id)
+    else:
+        options_id = options.id
+    user_form = SQLFORM(db.option, options_id)
+    if user_form.process(formname="user_form").accepted:
+        for k, v in user_form.vars.iteritems():
+            session.options[k] = v        
+        messages.append(LI(T("Done!")))
+    return dict(messages=messages, videos_form=videos_form,
+                user_form=user_form)
+
+@auth.requires_login()
+def subtitle():
+    import simplejson
+    if request.args(1) == "create":
+        starts = seconds_to_time(request.vars.starts)
+        ends = seconds_to_time(request.vars.ends)
+        subtitle_id = db.subtitle.insert(subtitulation_id=request.vars.subtitulation_id,
+                                         starts=starts,
+                                         ends=ends)
+        subtitle = db.subtitle[subtitle_id]
+        li = SUBTITLE(subtitle)
+        subtitle=subtitle.as_dict()
+        subtitle["starts"] = str(subtitle["starts"])
+        subtitle["ends"] = str(subtitle["ends"])
+        subtitle["body"] = ""
+        result = simplejson.dumps(dict(li=li.xml(), subtitle=subtitle))
+        return result
+
+    elif request.args(1) == "update":
+        def update_record(sub):
+            del(sub["startEvent"])
+            del(sub["endEvent"])
+            db.subtitle[sub["id"]].update_record(**sub)
+
+        payload = simplejson.loads(request.vars.data)
+        if isinstance(payload, dict):
+            update_record(payload)
+        elif isinstance(payload, list):
+            for item in payload:
+                update_record(item)
+        else:
+            raise HTTP(500, "Unexpected data format")
+        return simplejson.dumps("Done!")
+    elif request.args(1) == "delete":
+        result = db.subtitle[request.vars.id].delete_record()
+        return simplejson.dumps("ok")
+    else:
+        raise HTTP(501, "Not implemented")
+
+    
+    
+    
+    
+    

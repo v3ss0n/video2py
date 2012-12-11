@@ -1,8 +1,231 @@
+{{right_sidebar_enabled=True}}
 {{extend 'layout.html'}}
-<h1>{{=T("Subtitles")}}</h1>
-<ul>
-{{for subtitle in subtitles:}}
-<li>{{=A(subtitle.text, _href=URL('subtitles', args=(video.id, subtitle.id)))}}</li>
-{{pass}}
-</ul>
-{{=form}}
+
+{{=H5(video.title)}}
+
+{{=FORM(DIV(INPUT(_type="button", _value=T("Back"),
+                  _id="step_back"),
+             INPUT(_type="button", _value=T("Pause/Play"),
+                   _id="pause_play"),
+             INPUT(_type="button", _value=T("Forward"),
+                   _id="step_forward")),
+        DIV(LABEL(T("Step (seconds)")),
+                  INPUT(_type="text", _value=3, _id="step_value")))}}
+
+{{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+             _id="ourvideo", _style="width:80%;"),
+       _id="video")}}
+
+{{=SCRIPT("""
+jQuery(document).ready(function(){
+
+function getSubtitle(id){
+  var theSubtitle = null
+  jQuery.each(ourSubtitles,
+              function(i, obj){if(Number(obj.id) == Number(id)){
+                                theSubtitle = obj;
+                                return;}
+                                });
+  return theSubtitle;
+}
+
+function toggleSubtitle(id){
+  jQuery(".subtitle").css("display", "none");
+  jQuery("#subtitle-" + String(id)).css("display", "block");
+}
+
+function timeToSeconds(timeStr){
+  var seconds = Number(timeStr.slice(0, 2))*3600
+  seconds += Number(timeStr.slice(3, 5))*60
+  seconds += Number(timeStr.slice(6, 8));
+  return Number(seconds);}
+
+function toggleByTime(){
+  var subtitleTime = Number(pop.currentTime());
+  jQuery.each(ourSubtitles,
+              function (i, obj){
+                var starts = timeToSeconds(obj.starts);
+                var ends = timeToSeconds(obj.ends);
+                if ((starts <= subtitleTime)&&(ends >= subtitleTime)){
+                  currentSubtitle = obj;
+                  toggleSubtitle(obj.id);
+                  return;
+                }
+              });
+}
+
+function clickSubtitle(){
+  currentSubtitle = getSubtitle(this.id);
+  toggleSubtitle(this.id);
+  setSubtitleTime(this.id);
+}
+
+function insertCallback(data){
+  // Append the new subtitle to the object list
+  // and register it in popcorn
+  ourSubtitles.push(data.subtitle);
+  jQuery("#subtitles").append(data.li);
+  toggleSubtitle(data.subtitle.id);
+  addCue(data.subtitle);
+  jQuery("#subtitles .label").click(clickSubtitle);
+}
+
+function insertSubtitle(){
+  // Request a new subtitle
+  var url = "%(url)s" + "/create?";
+  url += "subtitulation_id=%(subtitulation)s";
+  url += "&starts=" + pop.currentTime();
+  url += "&ends=" + (pop.currentTime() + Number(%(subtitle_time)s));
+  jQuery.get(url, insertCallback);
+}
+
+function removeSubtitle(){
+// Remove current selected subtitle
+try{
+    // remove from list
+    jQuery("li#" + currentSubtitle.id).remove();
+    // remove from db
+    jQuery.get("%(url)s" + "/delete?id=" + currentSubtitle.id);
+    // Reset the cue event
+    removeCue(currentSubtitle);
+    // remove from array
+    var index = null;
+    jQuery.each(ourSubtitles, function(i, obj){if(obj.id == currentSubtitle.id){
+                                                 index = i;
+                                                 return;}
+              });
+    if (index) {
+                ourSubtitles.splice(index, 1)}
+  }
+catch(e){
+  // BUG: choosing the first subtitle triggers an addCue
+  // call that  sets currentSubtitle to null
+  // so it is not possible to remove the db record.
+}
+}
+
+function changeSubtitle(id){
+  // Get subtitle object
+  var subtitle = getSubtitle(id);
+
+  // Get form values
+  subtitle.starts = jQuery("#subtitle-" + id + " input.starts").val();
+  subtitle.ends = jQuery("#subtitle-" + id + " input.ends").val();
+  subtitle.body = jQuery("#subtitle-" + id + " textarea.body").val();
+
+  // Update label
+  jQuery("label#" + id).text(subtitle.starts + " - " + subtitle.ends);
+
+  // Cancel cues
+  removeCue(subtitle);
+  // Add new cues
+  addCue(subtitle);
+}
+
+function applySubtitles(id){
+  changeSubtitle(id);
+  submitSubtitles(id);
+}
+
+function applyAll(){
+  jQuery.each(ourSubtitles, function(i, obj){changeSubtitle(obj.id);});
+  submitSubtitles();
+}
+
+function submitSubtitlesCallback(data, text, jq){
+  // Server response on subtitle update
+}
+
+function submitSubtitles(id){
+  if (id){
+    var payload = getSubtitle(id);
+  }
+  else {var payload = ourSubtitles;}
+  jQuery.post("%(url)s" + "/update", {data: JSON.stringify(payload)}, submitSubtitlesCallback);
+}
+
+function stepForward(){
+  var newTime = Number(jQuery("#step_value").val())+Number(pop.currentTime());
+  pop.currentTime(newTime);
+  toggleByTime();
+}
+
+function stepBack(){
+  var newTime = Number(pop.currentTime())-Number(jQuery("#step_value").val());
+  pop.currentTime(newTime);
+  toggleByTime();
+}
+
+function pausePlay(){
+  if (pop.paused()){
+    pop.play();
+  }
+  else{
+    pop.pause();
+  }
+}
+
+function setSubtitleTime(id){
+  var tmpSubtitle = getSubtitle(id);
+  var newTime = timeToSeconds(tmpSubtitle.starts);
+  pop.currentTime(newTime);
+}
+
+function doNothing(){
+  // Do nothing
+}
+
+function removeCue(obj){
+  pop.cue(obj.startEvent, doNothing);
+  pop.cue(obj.eventEvent, doNothing);
+}
+
+function addCue(obj){
+  pop.cue(obj.starts,
+          function(){
+                     currentSubtitle = obj;
+                     toggleSubtitle(obj.id);
+                    });
+  obj.startEvent = pop.getLastTrackEventId();
+  pop.cue(obj.ends,
+          function(){
+                     currentSubtitle = null;
+          });
+  obj.endEvent = pop.getLastTrackEventId();
+}
+
+var pop = Popcorn("#ourvideo");
+var ourSubtitles = %(subtitles)s;
+var currentSubtitle = null;
+
+jQuery("label.label").click(clickSubtitle);
+jQuery("input.apply").click(function(){applySubtitles(this.id);});
+jQuery("#step_forward").click(stepForward);
+jQuery("#step_back").click(stepBack);
+jQuery("#pause_play").click(pausePlay);
+jQuery("#subtitle_insert").click(insertSubtitle);
+jQuery("#subtitle_remove").click(removeSubtitle);
+jQuery("#subtitle_apply").click(applyAll);
+jQuery(ourSubtitles).each(function(i, obj){
+                       addCue(obj);
+                     });
+
+});""" % dict(subtitles=subtitles.json(), subtitulation=subtitulation, 
+              url=URL(f="subtitle.json", args=["subtitle",]),
+              subtitle_time=session.options["subtitle_time"]),
+              _type="text/javascript")}}
+
+{{block right_sidebar}}
+{{=H5(T("Subtitles for %s language") % 
+      session.options["subtitle_language"])}}
+
+{{=UL(*[SUBTITLE(sub) for sub in subtitles], _id="subtitles")}}
+
+{{=FORM(INPUT(_type="button", _value=T("Remove"),
+              _id="subtitle_remove"),
+        INPUT(_type="button", _value=T("Insert"),
+              _id="subtitle_insert"),
+        INPUT(_type="button", _value=T("Apply changes"),
+              _id="subtitle_apply"))}}
+{{end}}
+
