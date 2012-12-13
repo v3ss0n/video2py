@@ -18,6 +18,8 @@ if auth.is_logged_in() and (not session.options):
 
 if request.function in ["show", "subtitles", "slides"]:
     response.files.append(URL(c='static', f="js/popcorn_complete.js"))
+    response.files.append(URL(c='static', f="js/jquery.scrollTo.min.js"))
+
 
 def index():
     """
@@ -60,6 +62,11 @@ def subtitles():
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
 
+    # Custom form for editing subtitles client-side
+    ioform = crud.create(db.subtitle)
+    if ioform.process(formname="ioform"):
+        pass
+
     sq = db.subtitulation.user_id == auth.user_id
     sq &= db.subtitulation.video_id == request.args(1)
     sq &= db.subtitulation.language == session.options["subtitle_language"]
@@ -97,9 +104,11 @@ def subtitles():
     else:
         subtitulation_id = subtitulation.id
 
-    subtitles = db(db.subtitle.subtitulation_id==subtitulation_id).select()
+    subs_set = db(db.subtitle.subtitulation_id==subtitulation_id)
+    subtitles = subs_set.select()
+
     return dict(video=video, sources=sources, subtitles=subtitles,
-                subtitulation=subtitulation_id)
+                subtitulation=subtitulation_id, ioform=ioform)
 
 def show():
     video = db.video[request.args(1)]
@@ -197,12 +206,12 @@ def subtitle():
                                          starts=starts,
                                          ends=ends)
         subtitle = db.subtitle[subtitle_id]
-        li = SUBTITLE(subtitle)
+        option = SUBTITLE(subtitle)
         subtitle=subtitle.as_dict()
         subtitle["starts"] = str(subtitle["starts"])
         subtitle["ends"] = str(subtitle["ends"])
         subtitle["body"] = ""
-        result = simplejson.dumps(dict(li=li.xml(), subtitle=subtitle))
+        result = simplejson.dumps(dict(option=option.xml(), subtitle=subtitle))
         return result
 
     elif request.args(1) == "update":
@@ -226,8 +235,4 @@ def subtitle():
     else:
         raise HTTP(501, "Not implemented")
 
-    
-    
-    
-    
-    
+

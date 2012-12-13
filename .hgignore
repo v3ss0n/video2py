@@ -1,0 +1,16 @@
+syntax: glob
+*~
+*.pyc
+*.pyo
+*.bak
+*.bak2
+.directory
+*.back*
+*.ini
+*plugin_wiki*
+cache/*
+private/*
+uploads/*
+databases/*
+sessions/*
+errors/*
