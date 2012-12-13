@@ -256,6 +256,7 @@ var ourSubtitles = %(subtitles)s;
 var currentSubtitle = null;
 
 jQuery("select#subtitles option").click(clickSubtitle);
+jQuery("select#subtitles").change(clickSubtitle);
 jQuery("input#apply").click(applySubtitles);
 jQuery("#step_forward").click(stepForward);
 jQuery("#step_back").click(stepBack);
