@@ -123,19 +123,18 @@ catch(e){
 }
 }
 
-function changeSubtitle(id){
+function changeSubtitle(){
   // Get subtitle object
-  if(id){
-    var subtitle = getSubtitle(id);
+  var myId = jQuery("#subtitles option:selected").val();
+  if(myId){
+    console.log("Current subtitle as reference is " + currentSubtitle.id);
+    var subtitle = getSubtitle(myId);
   }
   else{
-    if(currentSubtitle){
-      var subtitle = currentSubtitle;
-    }
-    else{
-      return;
-    }
+    console.log("Aborting change: no subtitle reference was selected");
+    return null;
   }
+
   // Get form values
   subtitle.starts = jQuery("[name=starts]").val();
   subtitle.ends = jQuery("[name=ends]").val();
@@ -149,14 +148,17 @@ function changeSubtitle(id){
   removeCue(subtitle);
   // Add new cues
   addCue(subtitle);
+  return myId
 }
 
 function applySubtitles(){
-  if (currentSubtitle){
-    changeSubtitle(currentSubtitle.id);
-    submitSubtitles(currentSubtitle.id);
+  var changed = changeSubtitle();
+  if(changed != null){
+    submitSubtitles(changed);
   }
-  else {}
+  else{
+    console.log("No subtitle reference");
+  }
 }
 
 function applyAll(){
@@ -206,23 +208,46 @@ function doNothing(){
   // Do nothing
 }
 
-function removeCue(obj){
-  pop.cue(obj.startEvent, doNothing);
-  pop.cue(obj.eventEvent, doNothing);
+function sameCue(obj){
+  var result = false;
+  jQuery.each(ourSubtitles, function(i, obj2){
+                              if(obj.ends == obj2.starts){
+                                result = true;
+                                console.log("Found a starts-ends conflict between " + obj.id + " and " + obj2.id);
+                                return;
+                              }
+                            });
+  return result;
 }
 
 function addCue(obj){
+  console.log("Adding a starting cue for subtitle " + obj.id);
   pop.cue(obj.starts,
           function(){
+                     console.log("Cue " + obj.id + " has started");
                      currentSubtitle = obj;
                      toggleSubtitle(obj.id);
                     });
   obj.startEvent = pop.getLastTrackEventId();
+  console.log("Adding a starting cue for subtitle " + obj.id);
   pop.cue(obj.ends,
           function(){
-                     currentSubtitle = null;
+                     console.log("Cue " + obj.id + " has ended");
+                     // Don't reset current subtitle if there is
+                     // another with the same cue time
+                     if(sameCue(obj)){
+                       currentSubtitle = null;
+                     }
+                     else{
+                       console.log("Preserving currentSubtitle value");
+                     }
           });
   obj.endEvent = pop.getLastTrackEventId();
+}
+
+function removeCue(obj){
+  pop.cue(obj.startEvent, doNothing);
+  pop.cue(obj.endEvent, doNothing);
 }
 
 var holDown = false;
@@ -241,9 +266,9 @@ jQuery("#subtitle_apply").click(applyAll);
 jQuery(ourSubtitles).each(function(i, obj){
                        addCue(obj);
                      });
-jQuery("[name=body]").change(function(){changeSubtitle();});
-jQuery("[name=starts]").change(function(){changeSubtitle();});
-jQuery("[name=ends]").change(function(){changeSubtitle();});
+jQuery("[name=body]").change(changeSubtitle);
+jQuery("[name=starts]").change(changeSubtitle);
+jQuery("[name=ends]").change(changeSubtitle);
 
 jQuery(document).keydown(function(e){if(e.ctrlKey){holDown = true;} });
 jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
