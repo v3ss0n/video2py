@@ -52,10 +52,20 @@ def index():
 
 @auth.requires_login()
 def slides():
+    slides = None
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
-    slides = db(db.slide.video_id==request.args(1)).select()
-    return dict(video=video, sources=sources, slides=slides)
+    presentation = db((db.presentation.video_id==request.args(1))).select().first()
+    if presentation:
+        presentation_id = presentation.id
+        slides = db(db.slide.presentation_id==presentation_id).select()
+    else:
+        presentation_id = db.presentation.insert(video_id=request.args(1), title=video.title)
+
+    db.slide.presentation_id.writable = False
+    db.slide.presentation_id.default = presentation_id
+    form = crud.create(db.slide)
+    return dict(video=video, sources=sources, slides=slides, form=form)
 
 @auth.requires_login()
 def subtitles():
@@ -111,9 +121,13 @@ def subtitles():
                 subtitulation=subtitulation_id, ioform=ioform)
 
 def show():
+    subtitles = None
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
-    return dict(video=video, sources=sources)
+    subtitulation = db((db.subtitulation.video_id==request.args(1))&(db.subtitulation.language==session.options["subtitle_language"])).select().first()
+    if subtitulation:
+        subtitles = db(db.subtitle.subtitulation_id==subtitulation.id).select()
+    return dict(video=video, sources=sources, subtitles=subtitles)
 
 def user():
     """

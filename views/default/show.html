@@ -1,19 +1,50 @@
 {{extend 'layout.html'}}
 {{=H3(T("Show video"))}}
 {{=H5(video.title)}}
-{{if video.service=="youtube":}}
-{{=DIV(_id="video")}}
-  {{=SCRIPT("""
-  jQuery(document).ready(function(){
-  var pop = Popcorn.youtube("#video", "www.youtube.com/watch?v=%(code)s");
-  });""" % dict(code=video.code), _type="text/javascript")}}
+
+{{if subtitles:}}
+  {{our_subtitles=subtitles.json()}}
 {{else:}}
-{{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+  {{our_subtitles="null"}}
+{{pass}}
+
+{{if video.service=="youtube":}}
+  {{=DIV(_id="video")}}
+  {{pop='var pop = Popcorn.youtube("#video", "www.youtube.com/watch?v=%(code)s");' % dict(code=video.code)}}
+{{else:}}
+  {{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
              _id="ourvideo"),
        _id="video")}}
-  {{=SCRIPT("""
-  jQuery(document).ready(function(){
-  var pop = Popcorn("#ourvideo");
-  });""", _type="text/javascript")}}
+  {{pop='var pop = Popcorn("#ourvideo");'}}
 {{pass}}
+{{=HR()}}
+{{=DIV(_id="subtitles", _style="font-size:2em;")}}
+
+{{=SCRIPT("""
+  jQuery(document).ready(function(){
+
+  function timeToSeconds(timeStr){
+    var seconds = Number(timeStr.slice(0, 2))*3600
+    seconds += Number(timeStr.slice(3, 5))*60
+    seconds += Number(timeStr.slice(6, 8));
+    return Number(seconds);}
+
+  %(pop)s
+  var ourSubtitles = %(our_subtitles)s;
+  if (ourSubtitles){
+    jQuery.each(ourSubtitles, function(i, subtitle){
+      console.log("Adding the subtitle:");
+      console.log(subtitle.body);
+      console.log("Starts: " + timeToSeconds(subtitle.starts));
+      console.log("Ends: " + timeToSeconds(subtitle.ends));
+      var result = pop.subtitle({
+        start: timeToSeconds(subtitle.starts),
+        end: timeToSeconds(subtitle.ends),
+        target: "subtitles",
+        text: subtitle.body,
+      });
+      console.log("Subtitle output value: " + result);
+    });
+  }
+});""" % dict(code=video.code, pop=pop, our_subtitles=our_subtitles), _type="text/javascript")}}
 

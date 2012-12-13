@@ -1,8 +1,11 @@
 {{extend 'layout.html'}}
-<h1>{{=T("Slides")}}</h1>
-<ul>
-{{for slide in slides:}}
-<li>{{=A(slide.title, _href=URL('slides', args=(video.id, slide.id)))}}</li>
+{{=H5(T("Slides"))}}
+{{if slides:}}
+  {{=SQLTABLE(slides)}}
+{{else:}}
+  {{=H3(T("No slides available for %s") % video.title)}}
 {{pass}}
-</ul>
+{{=HR()}}
+{{=H5(T("New slide"))}}
 {{=form}}
+
