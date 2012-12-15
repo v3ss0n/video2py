@@ -1,0 +1,336 @@
+{{right_sidebar_enabled=True}}
+{{extend 'layout.html'}}
+
+{{=H5(video.title)}}
+
+{{=FORM(DIV(INPUT(_type="button", _value=T("Back"),
+                  _id="step_back"),
+             INPUT(_type="button", _value=T("Pause/Play"),
+                   _id="pause_play"),
+             INPUT(_type="button", _value=T("Forward"),
+                   _id="step_forward")),
+        DIV(LABEL(T("Step (seconds)")),
+                  INPUT(_type="text", _value=3, _id="step_value")))}}
+
+{{if video.service=="youtube":}}
+  {{video_div=DIV(_id="video")}}
+  {{pop='Popcorn.youtube("%(id)s", "http://www.youtube.com/watch?v=%(code)s");' % dict(id="video", code=video.code)}}
+{{else:}}
+  {{video_div=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+               _id="ourvideo"),
+         _id="video", _class="slides")}}
+  {{pop='Popcorn("#ourvideo");'}}
+{{pass}}
+
+{{slides_ul=UL(LI(IMG(_alt=T("No slide for current time"), _src=""), _id="empty", _style="display:block;"), *[LI(IMG(_src=template.vurl), _id=template.id) for template in templates], _class="slides")}}
+{{=TABLE(TR(TD(video_div), TD(slides_ul)))}}
+
+{{=SCRIPT("""
+jQuery(document).ready(function(){
+
+function getSlide(id){
+  var theSlide = null
+  jQuery.each(ourSlides,
+              function(i, obj){if(Number(obj.id) == Number(id)){
+                                theSlide = obj;
+                                return;}
+                                });
+  return theSlide;
+}
+
+function fillSlideForm(id){
+  var theSlide = getSlide(id);
+  jQuery("[name=clones]").val(theSlide.clones);
+  jQuery("[name=starts]").val(theSlide.starts);
+  jQuery("[name=ends]").val(theSlide.ends);  
+}
+
+function showSelector(theSelector){console.log("showSelector: " + theSelector);return theSelector;}
+
+function showSlide(id){
+  console.log("Show slide");
+  jQuery("ul.slides li").css("display", "none")
+  if(id){
+    var theSlide = getSlide(id);
+    console.log("This slide clones slide " + theSlide.clones);
+    if(theSlide.clones){
+      jQuery(showSelector("ul.slides li#" + theSlide.clones)).css("display", "block");
+    }
+    else{
+      console.log("Showing the empty slide");
+      jQuery(showSelector("ul.slides li#" + "empty")).css("display", "block");      
+    }
+  }
+  else{
+    console.log("Showing the empty slide");
+    jQuery(showSelector("ul.slides li#" + "empty")).css("display", "block");
+  }
+}
+
+function toggleSlide(id){
+  fillSlideForm(id);
+  jQuery("select#slides option").attr("selected", false);
+  jQuery(showSelector("select#slides option[value=" + id + "]")).attr("selected", true);
+  showSlide(id);
+}
+
+function timeToSeconds(timeStr){
+  var seconds = Number(timeStr.slice(0, 2))*3600
+  seconds += Number(timeStr.slice(3, 5))*60
+  seconds += Number(timeStr.slice(6, 8));
+  return Number(seconds);}
+
+function toggleByTime(){
+  var slideTime = Number(pop.currentTime());
+  jQuery.each(ourSlides,
+              function (i, obj){
+                var starts = timeToSeconds(obj.starts);
+                var ends = timeToSeconds(obj.ends);
+                if ((starts <= slideTime) && (ends >= slideTime)){
+                  currentSlide = obj;
+                  toggleSlide(obj.id);
+                  return;
+                }
+              });
+}
+
+function clickSlide(){
+  if(!holDown){
+    currentSlide = getSlide(this.value);
+    toggleSlide(this.value);
+    setSlideTime(this.value);
+  }
+}
+
+function insertCallback(data){
+  // Append the new slide to the object list
+  // and register it in popcorn
+  ourSlides.push(data.slide);
+  jQuery("#slides").append(data.option);
+  toggleSlide(data.slide.id);
+  addCue(data.slide);
+  jQuery(showSelector("#slides [value=" + data.slide.id + "]")).click(clickSlide);
+}
+
+function insertSlide(){
+  // Request a new slide
+  var url = "%(url)s" + "/create?";
+  url += "presentation_id=%(presentation)s";
+  url += "&starts=" + pop.currentTime();
+  url += "&ends=" + (pop.currentTime() + Number(%(timeout)s));
+  var clones = jQuery("[name=clones]").val();
+  if(clones){
+    url += "&clones=" + clones;
+  }
+  jQuery.get(url, insertCallback);
+}
+
+function removeSlide(){
+// Remove current selected slides
+try{
+    // remove from list
+    jQuery("select#slides option:selected").each(function(i, obj){
+      jQuery("option[value=" + currentSlide.id + "]").remove();
+      // remove from db
+      jQuery.get("%(url)s" + "/delete?id=" + obj.value);
+      // Reset the cue event
+      removeCue(getSlide(obj.value));
+      // remove from array
+      var index = null;
+      jQuery.each(ourSlides, function(i, obj2){if(obj2.id == obj.value){
+                                                 index = i;
+                                                 return;}
+      });
+      if (index) {
+                  ourSlides.splice(index, 1)}
+      }
+    );
+  }
+catch(e){
+  // BUG: choosing the first slide triggers an addCue
+  // call that  sets currentSlide to null
+  // so it is not possible to remove the db record.
+}
+}
+
+function changeSlide(){
+  // Get slide object
+  var myId = jQuery("#slides option:selected").val();
+  if(myId){
+    console.log("Current slide as reference is " + currentSlide.id);
+    var slide = getSlide(myId);
+  }
+  else{
+    console.log("Aborting change: no slide reference was selected");
+    return null;
+  }
+
+  // Get form values
+  slide.starts = jQuery("[name=starts]").val();
+  slide.ends = jQuery("[name=ends]").val();
+  slide.clones = jQuery("[name=clones]").val();
+
+  // Update option
+  var mySelector = showSelector("option[value=" + slide.id + "]");
+  jQuery(mySelector).text(slide.starts + " - " + slide.ends);
+
+  // Cancel cues
+  removeCue(slide);
+  // Add new cues
+  addCue(slide);
+  return myId
+}
+
+function applySlides(){
+  var changed = changeSlide();
+  if(changed != null){
+    submitSlides(changed);
+  }
+  else{
+    console.log("No slide reference");
+  }
+}
+
+function applyAll(){
+  submitSlides();
+}
+
+function submitSlidesCallback(data, text, jq){
+  // Server response on slide update
+}
+
+function submitSlides(id){
+  if (id){
+    var payload = getSlide(id);
+  }
+  else {var payload = ourSlides;}
+  jQuery.post("%(url)s" + "/update", {data: JSON.stringify(payload)}, submitSlidesCallback);
+}
+
+function stepForward(){
+  var newTime = Number(jQuery("#step_value").val())+Number(pop.currentTime());
+  pop.currentTime(newTime);
+  toggleByTime();
+}
+
+function stepBack(){
+  var newTime = Number(pop.currentTime())-Number(jQuery("#step_value").val());
+  pop.currentTime(newTime);
+  toggleByTime();
+}
+
+function pausePlay(){
+  if (pop.paused()){
+    pop.play();
+  }
+  else{
+    pop.pause();
+  }
+}
+
+function setSlideTime(id){
+  var tmpSlide = getSlide(id);
+  var newTime = timeToSeconds(tmpSlide.starts);
+  pop.currentTime(newTime);
+}
+
+function doNothing(){
+  // Do nothing
+}
+
+function sameCue(obj){
+  var result = false;
+  jQuery.each(ourSlides, function(i, obj2){
+                              if(obj.ends == obj2.starts){
+                                result = true;
+                                console.log("Found a starts-ends conflict between " + obj.id + " and " + obj2.id);
+                                return;
+                              }
+                            });
+  return result;
+}
+
+function addCue(obj){
+  console.log("Adding a starting cue for slide " + obj.id);
+  pop.cue(obj.starts,
+          function(){
+                     console.log("Cue " + obj.id + " has started");
+                     currentSlide = obj;
+                     toggleSlide(obj.id);
+                    });
+  obj.startEvent = pop.getLastTrackEventId();
+  console.log("Adding a starting cue for slide " + obj.id);
+  pop.cue(obj.ends,
+          function(){
+                     console.log("Cue " + obj.id + " has ended");
+                     // Don't reset current slide if there is
+                     // another with the same cue time
+                     if(sameCue(obj)){
+                       console.log("Preserving currentSlide value");
+                     }
+                     else{
+                       currentSlide = null;
+                       showSlide();
+                     }
+          });
+  obj.endEvent = pop.getLastTrackEventId();
+}
+
+function removeCue(obj){
+  pop.cue(obj.startEvent, doNothing);
+  pop.cue(obj.endEvent, doNothing);
+}
+
+var holDown = false;
+var pop = %(pop)s;
+var ourSlides = %(slides)s;
+var currentSlide = null;
+
+jQuery("select#slides option").click(clickSlide);
+jQuery("select#slides").change(clickSlide);
+jQuery("input#apply").click(applySlides);
+jQuery("#step_forward").click(stepForward);
+jQuery("#step_back").click(stepBack);
+jQuery("#pause_play").click(pausePlay);
+jQuery("#slide_insert").click(insertSlide);
+jQuery("#slide_remove").click(removeSlide);
+jQuery("#slide_apply").click(applyAll);
+jQuery(ourSlides).each(function(i, obj){
+                       addCue(obj);
+                     });
+jQuery("[name=clones]").change(changeSlide);
+jQuery("[name=starts]").change(changeSlide);
+jQuery("[name=ends]").change(changeSlide);
+
+jQuery(document).keydown(function(e){if(e.ctrlKey){holDown = true;} });
+jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
+
+});""" % dict(slides=slides.json(), presentation=presentation, 
+              url=URL(f="slide.json", args=["slide",]),
+              timeout=session.options["timeout"], pop=pop),
+              _type="text/javascript")}}
+
+{{block right_sidebar}}
+{{=H5(T("Slides for %s language") % 
+      session.options["language"])}}
+{{=FORM(INPUT(_type="button", _value=T("Remove"),
+              _id="slide_remove"),
+        INPUT(_type="button", _value=T("Insert"),
+              _id="slide_insert"),
+        INPUT(_type="button", _value=T("Apply all changes"),
+              _id="slide_apply"))}}
+
+{{=SELECT(*[OPTION("%(starts)s - %(ends)s" % dict(starts=sub.starts, ends=sub.ends), _value=sub.id) for sub in slides], _multiple="multiple", _id="slides")}}
+
+{{=ioform.custom.begin}}
+{{=LABEL(T("Slide"))}}{{=BR()}}
+{{=ioform.custom.widget.clones}}{{=BR()}}
+{{=LABEL(T("Starts"))}}{{=BR()}}
+{{=ioform.custom.widget.starts}}{{=BR()}}
+{{=LABEL(T("Ends"))}}{{=BR()}}
+{{=ioform.custom.widget.ends}}{{=BR()}}
+{{=ioform.custom.end}}{{=BR()}}
+{{=INPUT(_type="button", _value=T("Apply"),
+              _id="apply")}}
+{{end}}
+

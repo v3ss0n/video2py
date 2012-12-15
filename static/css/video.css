@@ -1,0 +1,24 @@
+div.slides video{
+width: 90%;
+}
+
+ul.slides img{
+width: 80%;
+}
+
+ul.slides li{
+display: none;
+}
+
+div.subtitles video{
+width: 50%;
+}
+
+table.show video{
+width:50%;
+}
+
+table.show img{
+width: 50%;
+}
+

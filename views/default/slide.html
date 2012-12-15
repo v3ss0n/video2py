@@ -1,0 +1,16 @@
+{{extend 'layout.html'}}
+{{def my_img(i, row):}}
+  {{return IMG(_alt=i, _src=row.vurl, _style="width:100px;")}}
+{{pass}}
+{{=H3(T("Slides"))}}
+{{=A(T("Slides editor"), _href=URL(f="slides", args=["video", video.id]))}}
+{{=HR()}}
+{{=H5(T("New slide"))}}
+{{=form}}
+{{if slides:}}
+  {{=HR()}}
+  {{db.slide.id.represent = my_img}}
+  {{=SQLTABLE(slides, columns=["slide.code", "slide.id"], headers={"slide.code": T("Code"), "slide.id": T("Image")})}}
+{{else:}}
+  {{=H5(T("No slides available for %s") % video.title)}}
+{{pass}}

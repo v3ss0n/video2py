@@ -1,0 +1,19 @@
+{{extend 'layout.html'}}
+{{=H3(T("Show video"))}}
+{{=H5(video.title)}}
+{{if video.service=="youtube":}}
+{{=DIV(_id="video")}}
+  {{=SCRIPT("""
+  jQuery(document).ready(function(){
+  var pop = Popcorn.youtube("#video", "www.youtube.com/watch?v=%(code)s");
+  });""" % dict(code=video.code), _type="text/javascript")}}
+{{else:}}
+{{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+             _id="ourvideo"),
+       _id="video")}}
+  {{=SCRIPT("""
+  jQuery(document).ready(function(){
+  var pop = Popcorn("#ourvideo");
+  });""", _type="text/javascript")}}
+{{pass}}
+
