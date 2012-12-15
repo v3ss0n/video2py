@@ -7,44 +7,81 @@
 {{else:}}
   {{our_subtitles="null"}}
 {{pass}}
+{{=A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))}} /
+{{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}}  
 
 {{if video.service=="youtube":}}
-  {{=DIV(_id="video")}}
+  {{video_div=DIV(_id="video")}}
   {{pop='var pop = Popcorn.youtube("#video", "www.youtube.com/watch?v=%(code)s");' % dict(code=video.code)}}
 {{else:}}
-  {{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
+  {{video_div=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
              _id="ourvideo"),
        _id="video")}}
   {{pop='var pop = Popcorn("#ourvideo");'}}
 {{pass}}
 {{=HR()}}
-{{=DIV(_id="subtitles", _style="font-size:2em;")}}
+{{subtitles_div=DIV(_id="subtitles", _style="font-size:1.5em;")}}
+
+{{if slides:}}
+{{slides_ul=UL(LI(IMG(_alt=T("No slide for current time"), _src=""), _id="empty", _style="display:block;"), *[LI(IMG(_src=slide.vurl), _id=slide.id) for slide in slides], _class="slides")}}
+{{our_slides=slides.json()}}
+{{else:}}
+{{slides_ul = UL()}}
+{{our_slides="null"}}
+{{pass}}
+
+{{=TABLE(TR(TD(video_div), TD(slides_ul)), TR(TD(subtitles_div), TD()), _class="show")}}
 
 {{=SCRIPT("""
   jQuery(document).ready(function(){
 
   function timeToSeconds(timeStr){
-    var seconds = Number(timeStr.slice(0, 2))*3600
-    seconds += Number(timeStr.slice(3, 5))*60
+    var seconds = Number(timeStr.slice(0, 2))*3600;
+    seconds += Number(timeStr.slice(3, 5))*60;
     seconds += Number(timeStr.slice(6, 8));
     return Number(seconds);}
 
+  function showSlide(id){
+ // console.log("Showing slide " + id);
+    jQuery("ul.slides li").css("display", "none");
+    jQuery("ul.slides #" + id).css("display", "block");
+  }
+
   %(pop)s
   var ourSubtitles = %(our_subtitles)s;
+  var ourSlides = %(our_slides)s;
   if (ourSubtitles){
     jQuery.each(ourSubtitles, function(i, subtitle){
-      console.log("Adding the subtitle:");
-      console.log(subtitle.body);
-      console.log("Starts: " + timeToSeconds(subtitle.starts));
-      console.log("Ends: " + timeToSeconds(subtitle.ends));
+   // console.log("Adding the subtitle:");
+   // console.log(subtitle.body);
+   // console.log("Starts: " + timeToSeconds(subtitle.starts));
+   // console.log("Ends: " + timeToSeconds(subtitle.ends));
       var result = pop.subtitle({
         start: timeToSeconds(subtitle.starts),
         end: timeToSeconds(subtitle.ends),
         target: "subtitles",
         text: subtitle.body,
       });
-      console.log("Subtitle output value: " + result);
+   // console.log("Subtitle output value: " + result);
     });
   }
-});""" % dict(code=video.code, pop=pop, our_subtitles=our_subtitles), _type="text/javascript")}}
+
+  if (ourSlides){
+    jQuery.each(ourSlides, function(i, slide){
+   // console.log("Adding the slide " + slide.id);
+   // console.log("Starts: " + slide.starts);
+      pop.cue(slide.starts,
+              function(){
+                         showSlide(slide.id);
+                        }
+             );
+      pop.cue(slide.ends,
+              function(){
+                         jQuery("ul.slides li").css("display", "none");
+                        }
+             );
+  });
+  }
+
+});""" % dict(code=video.code, pop=pop, our_subtitles=our_subtitles, our_slides=our_slides), _type="text/javascript")}}
 

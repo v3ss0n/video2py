@@ -13,12 +13,12 @@
                   INPUT(_type="text", _value=3, _id="step_value")))}}
 
 {{if video.service=="youtube":}}
-  {{=DIV(_id="video")}}
+  {{=DIV(_id="video", _class="subtitles")}}
   {{pop='Popcorn.youtube("%(id)s", "http://www.youtube.com/watch?v=%(code)s");' % dict(id="video", code=video.code)}}
 {{else:}}
   {{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
                _id="ourvideo"),
-         _id="video")}}
+         _id="video", _class="subtitles")}}
   {{pop='Popcorn("#ourvideo");'}}
 {{pass}}
 
@@ -91,7 +91,7 @@ function insertSubtitle(){
   var url = "%(url)s" + "/create?";
   url += "subtitulation_id=%(subtitulation)s";
   url += "&starts=" + pop.currentTime();
-  url += "&ends=" + (pop.currentTime() + Number(%(subtitle_time)s));
+  url += "&ends=" + (pop.currentTime() + Number(%(timeout)s));
   jQuery.get(url, insertCallback);
 }
 
@@ -100,7 +100,7 @@ function removeSubtitle(){
 try{
     // remove from list
     jQuery("select#subtitles option:selected").each(function(i, obj){
-      jQuery("option[value=" + currentSubtitle.id + "]").remove();
+      jQuery("option[value=" + obj.value + "]").remove();
       // remove from db
       jQuery.get("%(url)s" + "/delete?id=" + obj.value);
       // Reset the cue event
@@ -127,11 +127,11 @@ function changeSubtitle(){
   // Get subtitle object
   var myId = jQuery("#subtitles option:selected").val();
   if(myId){
-    console.log("Current subtitle as reference is " + currentSubtitle.id);
+    // console.log("Current subtitle as reference is " + currentSubtitle.id);
     var subtitle = getSubtitle(myId);
   }
   else{
-    console.log("Aborting change: no subtitle reference was selected");
+    // console.log("Aborting change: no subtitle reference was selected");
     return null;
   }
 
@@ -157,7 +157,7 @@ function applySubtitles(){
     submitSubtitles(changed);
   }
   else{
-    console.log("No subtitle reference");
+    // console.log("No subtitle reference");
   }
 }
 
@@ -213,7 +213,7 @@ function sameCue(obj){
   jQuery.each(ourSubtitles, function(i, obj2){
                               if(obj.ends == obj2.starts){
                                 result = true;
-                                console.log("Found a starts-ends conflict between " + obj.id + " and " + obj2.id);
+                                // console.log("Found a starts-ends conflict between " + obj.id + " and " + obj2.id);
                                 return;
                               }
                             });
@@ -221,25 +221,25 @@ function sameCue(obj){
 }
 
 function addCue(obj){
-  console.log("Adding a starting cue for subtitle " + obj.id);
+  // console.log("Adding a starting cue for subtitle " + obj.id);
   pop.cue(obj.starts,
           function(){
-                     console.log("Cue " + obj.id + " has started");
+                     // console.log("Cue " + obj.id + " has started");
                      currentSubtitle = obj;
                      toggleSubtitle(obj.id);
                     });
   obj.startEvent = pop.getLastTrackEventId();
-  console.log("Adding a starting cue for subtitle " + obj.id);
+  // console.log("Adding a starting cue for subtitle " + obj.id);
   pop.cue(obj.ends,
           function(){
-                     console.log("Cue " + obj.id + " has ended");
+                     // console.log("Cue " + obj.id + " has ended");
                      // Don't reset current subtitle if there is
                      // another with the same cue time
                      if(sameCue(obj)){
                        currentSubtitle = null;
                      }
                      else{
-                       console.log("Preserving currentSubtitle value");
+                       // console.log("Preserving currentSubtitle value");
                      }
           });
   obj.endEvent = pop.getLastTrackEventId();
@@ -276,12 +276,12 @@ jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
 
 });""" % dict(subtitles=subtitles.json(), subtitulation=subtitulation, 
               url=URL(f="subtitle.json", args=["subtitle",]),
-              subtitle_time=session.options["subtitle_time"], pop=pop),
+              timeout=session.options["timeout"], pop=pop),
               _type="text/javascript")}}
 
 {{block right_sidebar}}
 {{=H5(T("Subtitles for %s language") % 
-      session.options["subtitle_language"])}}
+      session.options["language"])}}
 {{=FORM(INPUT(_type="button", _value=T("Remove"),
               _id="subtitle_remove"),
         INPUT(_type="button", _value=T("Insert"),

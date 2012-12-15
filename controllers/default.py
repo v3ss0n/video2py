@@ -14,11 +14,12 @@ if auth.is_logged_in() and (not session.options):
     if USER_OPTIONS is not None:
         session.options = USER_OPTIONS.as_dict()
     else:
-        session.options = {"subtitle_language": None, "subtitle_time": 3}
+        session.options = {"language": None, "timeout": 3}
 
 if request.function in ["show", "subtitles", "slides"]:
     response.files.append(URL(c='static', f="js/popcorn_complete.js"))
     response.files.append(URL(c='static', f="js/jquery.scrollTo.min.js"))
+    response.files.append(URL(c='static', f="css/video.css"))
 
 
 def index():
@@ -50,22 +51,64 @@ def index():
     videos = db(db.video).select()
     return dict(videos=videos)
 
+
 @auth.requires_login()
 def slides():
-    slides = None
+    mylanguage = session.options["language"]
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
-    presentation = db((db.presentation.video_id==request.args(1))).select().first()
-    if presentation:
-        presentation_id = presentation.id
-        slides = db(db.slide.presentation_id==presentation_id).select()
-    else:
-        presentation_id = db.presentation.insert(video_id=request.args(1), title=video.title)
 
-    db.slide.presentation_id.writable = False
-    db.slide.presentation_id.default = presentation_id
-    form = crud.create(db.slide)
-    return dict(video=video, sources=sources, slides=slides, form=form)
+    sq = db.presentation.user_id == auth.user_id
+    sq &= db.presentation.video_id == request.args(1)
+    sq &= db.presentation.language == mylanguage
+    presentation = db(sq).select().first()
+
+    if presentation is None:
+        presentation_id = db.presentation.insert(user_id=auth.user_id,
+                                                 video_id=request.args(1),
+                                                 language=mylanguage,
+                                                 title=video.title)
+
+        # Fill presentation with previous slides
+        other_slides = db((db.presentation.video_id==request.args(1)) & \
+                        (db.presentation.language==mylanguage) & \
+                        (db.presentation.id!=presentation_id)).select()
+        slides_qties = dict()
+
+        for oslide in other_slides:
+            subcount = db(db.slide.presentation_id==oslide.id).count()
+            slides_qties[subcount] = oslide.id
+
+        if len(slides_qties) > 0:
+            other_slides_id = slide_qties[max(slides_qties)]
+            other_slides = db(db.slide.presentation_id==other_slides_id).select()
+            for other_slide in other_slide:
+                oslide = other_slide.as_dict()
+                del(oslide["id"])
+                del(oslide["presentation_id"])
+                oslide["presentation_id"] = presentation_id
+                db.slide.insert(**oslide)
+        else:
+            # This is the first presentation for this language
+            # set as default
+            db.presentation[presentation_id].update_record(auto=True)
+    else:
+        presentation_id = presentation.id
+
+    slides_set = db((db.slide.presentation_id==presentation_id)&(db.slide.template==False))
+    slides = slides_set.select()
+    templates = db((db.slide.presentation_id==presentation_id)&(db.slide.template==True)).select()
+
+    # Custom form for editing slides client-side
+    db.slide.clones.requires = CLONES_SLIDE(presentation_id)    
+    ioform = crud.create(db.slide)
+    if ioform.process(formname="ioform"):
+        pass
+
+    return dict(video=video, sources=sources, slides=slides,
+                presentation=presentation_id, ioform=ioform,
+                templates=templates)
+
 
 @auth.requires_login()
 def subtitles():
@@ -79,9 +122,9 @@ def subtitles():
 
     sq = db.subtitulation.user_id == auth.user_id
     sq &= db.subtitulation.video_id == request.args(1)
-    sq &= db.subtitulation.language == session.options["subtitle_language"]
+    sq &= db.subtitulation.language == session.options["language"]
     subtitulation = db(sq).select().first()
-    mylanguage = session.options["subtitle_language"]
+    mylanguage = session.options["language"]
 
     if subtitulation is None:
         subtitulation_id = db.subtitulation.insert(user_id=auth.user_id,
@@ -122,12 +165,17 @@ def subtitles():
 
 def show():
     subtitles = None
+    language = session.options["language"]
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
-    subtitulation = db((db.subtitulation.video_id==request.args(1))&(db.subtitulation.language==session.options["subtitle_language"])).select().first()
+    subtitulation = db((db.subtitulation.video_id==request.args(1))&(db.subtitulation.language==session.options["language"])).select().first()
     if subtitulation:
         subtitles = db(db.subtitle.subtitulation_id==subtitulation.id).select()
-    return dict(video=video, sources=sources, subtitles=subtitles)
+    presentation = db((db.presentation.language==language)&(db.presentation.video_id==video.id)).select().first()
+    slides = None
+    if presentation:
+        slides = db((db.slide.presentation_id==presentation.id)&(db.slide.template==False)).select()
+    return dict(video=video, sources=sources, subtitles=subtitles, slides=slides)
 
 def user():
     """
@@ -213,6 +261,7 @@ def setup():
 @auth.requires_login()
 def subtitle():
     import simplejson
+    T.lazy = False
     if request.args(1) == "create":
         starts = seconds_to_time(request.vars.starts)
         ends = seconds_to_time(request.vars.ends)
@@ -249,4 +298,72 @@ def subtitle():
     else:
         raise HTTP(501, "Not implemented")
 
+
+@auth.requires_login()
+def slide():
+    if request.extension == "json":
+        import simplejson
+        T.lazy = False
+        if request.args(1) == "create":
+            starts = seconds_to_time(request.vars.starts)
+            ends = seconds_to_time(request.vars.ends)
+            if request.vars.clones:
+                clones = request.vars.clones
+            else:
+                clones = None
+            slide_id = db.slide.insert(presentation_id=request.vars.presentation_id,
+                                       starts=starts,
+                                       ends=ends,
+                                       clones=clones)
+            slide = db.slide[slide_id]
+            option = SLIDE(slide)
+            slide=slide.as_dict()
+            slide["starts"] = str(slide["starts"])
+            slide["ends"] = str(slide["ends"])
+            if not clones:
+                slide["clones"] = ""
+            result = simplejson.dumps(dict(option=option.xml(), slide=slide))
+            return result
+    
+        elif request.args(1) == "update":
+            def update_record(myslide):
+                del(myslide["startEvent"])
+                del(myslide["endEvent"])
+                db.slide[myslide["id"]].update_record(**myslide)
+    
+            payload = simplejson.loads(request.vars.data)
+            if isinstance(payload, dict):
+                update_record(payload)
+            elif isinstance(payload, list):
+                for item in payload:
+                    update_record(item)
+            else:
+                raise HTTP(500, "Unexpected data format")
+            return simplejson.dumps(T("Done!"))
+        elif request.args(1) == "delete":
+            result = db.slide[request.vars.id].delete_record()
+            return simplejson.dumps(T("Done!"))
+        else:
+            raise HTTP(501, T("Not implemented"))
+
+    else:
+        slides = None
+        video = db.video[int(request.args(1))]
+        sources = db(db.source.video_id==request.args(1)).select()
+        presentation = db((db.presentation.video_id==request.args(1))).select().first()
+        if presentation:
+            presentation_id = presentation.id
+        else:
+            presentation_id = db.presentation.insert(video_id=request.args(1), title=video.title)
+
+        db.slide.presentation_id.writable = False
+        db.slide.template.default = True
+        db.slide.presentation_id.default = presentation_id
+        db.slide.starts.writable = db.slide.starts.readable = False
+        db.slide.ends.writable = db.slide.ends.readable = False
+        db.slide.clones.writable = db.slide.clones.readable = False
+        # db.slide.clones.requires = CLONES_SLIDE(presentation_id)
+        form = crud.create(db.slide)
+        slides = db((db.slide.presentation_id==presentation_id)&(db.slide.template==True)).select()
+        return dict(video=video, sources=sources, slides=slides, form=form)
 
