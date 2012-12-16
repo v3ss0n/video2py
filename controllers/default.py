@@ -9,17 +9,20 @@
 ## - call exposes all registered services (none by default)
 #########################################################################
 
-if auth.is_logged_in() and (not session.options):
-    USER_OPTIONS = db(db.option.user_id==auth.user_id).select().first()
-    if USER_OPTIONS is not None:
-        session.options = USER_OPTIONS.as_dict()
-    else:
-        session.options = {"language": None, "timeout": 3}
-        db.option.insert(user_id=auth.user_id, language=None, timeout=3)
+default_options = {"language": LANGUAGE, "timeout": 3}
+if auth.is_logged_in():
+    if not session.options:
+        user_options = db(db.option.user_id==auth.user_id).select().first()
+        if not user_options:
+            db.option.insert(user_id=auth.user_id,
+                             language=default_options["language"],
+                             timeout=default_options["timeout"])
+            session.options = default_options
+        else:
+            session.options = user_options.as_dict()
 elif (not session.options):
-    session.options = {"language": None, "timeout": 3}
+    session.options = default_options
     
-
 if request.function in ["show", "subtitles", "slides"]:
     response.files.append(URL(c='static', f="js/popcorn_complete.js"))
     response.files.append(URL(c='static', f="js/jquery.scrollTo.min.js"))
@@ -85,12 +88,13 @@ def slides():
             slides_qties[subcount] = oslide.id
 
         if len(slides_qties) > 0:
-            other_slides_id = slide_qties[max(slides_qties)]
+            other_slides_id = slides_qties[max(slides_qties)]
             other_slides = db(db.slide.presentation_id==other_slides_id).select()
-            for other_slide in other_slide:
+            for other_slide in other_slides:
                 oslide = other_slide.as_dict()
                 del(oslide["id"])
                 del(oslide["presentation_id"])
+                del(oslide["vurl"])
                 oslide["presentation_id"] = presentation_id
                 db.slide.insert(**oslide)
         else:
@@ -171,6 +175,7 @@ def subtitles():
                 subtitulation=subtitulation_id, ioform=ioform)
 
 def show():
+    mypresentation = request.args(3)
     subtitles = slides = None
     language = session.options["language"]
     video = db.video[request.args(1)]
@@ -178,14 +183,29 @@ def show():
     subtitulation = db((db.subtitulation.video_id==request.args(1))&(db.subtitulation.language==session.options["language"])).select().first()
     if subtitulation:
         subtitles = db(db.subtitle.subtitulation_id==subtitulation.id).select()
-        
-    presentation = db((db.presentation.language==language)&(db.presentation.video_id==video.id)).select().first()
-    if not presentation:
-        # Default to the first presentation submitted
-        presentation = db(db.presentation.video_id==video.id).select().first()    
+    presentations = db(db.presentation.video_id==video.id).select()
+    mypresentations = dict()
+    for presentation in presentations:
+        p_user = db.auth_user[presentation.user_id]
+        mypresentations[presentation.id] = T("(%(language)s): %(slides)s slides, by %(user)s") % dict(language=presentation.language, slides=db((db.slide.presentation_id==presentation.id)&(db.slide.template==False)).count(), user=str(p_user.first_name) + " " + str(p_user.last_name))
+    if mypresentation:
+        default_p = mypresentation
+    else:
+        try:
+            default_p = presentations.first().id
+        except AttributeError:
+            default_p = None
+    form = SQLFORM.factory(Field("presentation", requires=IS_IN_SET(mypresentations), default=default_p))
+    if form.process().accepted:
+        redirect(URL(f="show", args=["video", video.id, "presentation", form.vars.presentation]))
+    if mypresentation:
+        presentation = db.presentation[mypresentation]
+    else:
+        presentation = presentations.first()
     if presentation:
         slides = db((db.slide.presentation_id==presentation.id)&(db.slide.template==False)).select()
-    return dict(video=video, sources=sources, subtitles=subtitles, slides=slides)
+    return dict(video=video, sources=sources, subtitles=subtitles, slides=slides, form=form,
+                presentation=presentation)
 
 def user():
     """

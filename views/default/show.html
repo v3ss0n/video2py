@@ -34,6 +34,8 @@
 
 {{=TABLE(TR(TD(video_div), TD(slides_ul)), TR(TD(subtitles_div), TD()), _class="show")}}
 
+{{=form}}
+
 {{=SCRIPT("""
   jQuery(document).ready(function(){
 
@@ -86,4 +88,3 @@
   }
 
 });""" % dict(code=video.code, pop=pop, our_subtitles=our_subtitles, our_slides=our_slides), _type="text/javascript")}}
-
