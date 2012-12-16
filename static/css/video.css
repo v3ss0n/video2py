@@ -1,24 +1,62 @@
 div.slides video{
-width: 90%;
+width: 20em;
+}
+
+table.show div#subtitles{
+width:20em;
+height: 4.5em;
 }
 
 ul.slides img{
-width: 80%;
+width: 25em;
 }
 
 ul.slides li{
 display: none;
+width: 25em;
 }
 
 div.subtitles video{
-width: 50%;
+width: 20em;
 }
 
 table.show video{
-width:50%;
+width:20em;
 }
 
 table.show img{
-width: 50%;
+width: 25em;
 }
 
+/*
+div.slides video{
+width: 95%;
+height: 95%;
+}
+
+ul.slides img{
+width: 95%;
+height: 95%;
+}
+
+ul.slides li{
+display: none;
+width: 95%;
+height: 95%;
+}
+
+div.subtitles video{
+width: 95%;
+height: 95%;
+}
+
+table.show video{
+width:95%;
+height: 95%;
+}
+
+table.show img{
+width: 95%;
+height: 95%;
+}
+*/
