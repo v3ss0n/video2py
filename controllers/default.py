@@ -10,6 +10,12 @@
 #########################################################################
 
 default_options = {"language": LANGUAGE, "timeout": 3}
+
+def authorize(table, record_id):
+    myrecord = db[table][record_id]
+    if not ((myrecord.user_id != auth.user_id) or (auth.has_membership(role="manager"))):
+        raise HTTP(403, T("The requeste action could not be performed. You must own the record or be in the managers list"), lazy=False)
+
 if auth.is_logged_in():
     if not session.options:
         user_options = db(db.option.user_id==auth.user_id).select().first()
@@ -196,6 +202,7 @@ def show():
         except AttributeError:
             default_p = None
     form = SQLFORM.factory(Field("presentation", requires=IS_IN_SET(mypresentations), default=default_p))
+    form.custom.submit["_value"] = T("Change")
     if form.process().accepted:
         redirect(URL(f="show", args=["video", video.id, "presentation", form.vars.presentation]))
     if mypresentation:
@@ -292,6 +299,10 @@ def setup():
 def subtitle():
     from gluon.contrib import simplejson
     T.lazy = False
+    if request.args(1) in ["delete", "update"]:
+        subtitulation = db.subtitulation[request.vars.subtitulation_id]
+        authorize("subtitulation", subtitulation.id)
+        
     if request.args(1) == "create":
         starts = seconds_to_time(request.vars.starts)
         ends = seconds_to_time(request.vars.ends)
@@ -311,6 +322,7 @@ def subtitle():
         def update_record(sub):
             del(sub["startEvent"])
             del(sub["endEvent"])
+            authorize("subtitle", sub["id"])
             db.subtitle[sub["id"]].update_record(**sub)
 
         payload = simplejson.loads(request.vars.data)
@@ -323,17 +335,18 @@ def subtitle():
             raise HTTP(500, "Unexpected data format")
         return simplejson.dumps("Done!")
     elif request.args(1) == "delete":
+        authorize("subtitle", request.vars.id)
         result = db.subtitle[request.vars.id].delete_record()
         return simplejson.dumps("ok")
     else:
         raise HTTP(501, "Not implemented")
-
 
 @auth.requires_login()
 def slide():
     if request.extension == "json":
         from gluon.contrib import simplejson
         T.lazy = False
+
         if request.args(1) == "create":
             starts = seconds_to_time(request.vars.starts)
             ends = seconds_to_time(request.vars.ends)
@@ -359,6 +372,7 @@ def slide():
             def update_record(myslide):
                 del(myslide["startEvent"])
                 del(myslide["endEvent"])
+                authorize("slide", myslide["id"])                
                 db.slide[myslide["id"]].update_record(**myslide)
     
             payload = simplejson.loads(request.vars.data)
@@ -371,6 +385,7 @@ def slide():
                 raise HTTP(500, "Unexpected data format")
             return simplejson.dumps(T("Done!"))
         elif request.args(1) == "delete":
+            authorize("slide", request.vars.id)
             result = db.slide[request.vars.id].delete_record()
             return simplejson.dumps(T("Done!"))
         else:
@@ -379,6 +394,7 @@ def slide():
     else:
         slides = None
         video = db.video[int(request.args(1))]
+        authorize("video", video.id)
         sources = db(db.source.video_id==request.args(1)).select()
         presentation = db((db.presentation.video_id==request.args(1))).select().first()
         if presentation:
@@ -392,7 +408,6 @@ def slide():
         db.slide.starts.writable = db.slide.starts.readable = False
         db.slide.ends.writable = db.slide.ends.readable = False
         db.slide.clones.writable = db.slide.clones.readable = False
-        # db.slide.clones.requires = CLONES_SLIDE(presentation_id)
         form = crud.create(db.slide)
         slides = db((db.slide.presentation_id==presentation_id)&(db.slide.template==True)).select()
         return dict(video=video, sources=sources, slides=slides, form=form)
@@ -403,6 +418,8 @@ def video():
     video_id = request.args(1)
     db.video.user_id.writable = False
     if action == "update":
+        video = db.video[video_id]
+        authorize("video", video.id)
         form = crud.update(db.video, video_id)
     else:
         form = crud.create(db.video)
@@ -411,6 +428,7 @@ def video():
 @auth.requires_login()
 def sources():
     video = db.video[request.args(1)]
+    authorize("video", video.id)
     action = request.args(3)
     source_id = request.args(5)
     if (action == "update") and source_id:
