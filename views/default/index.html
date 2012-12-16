@@ -1,14 +1,22 @@
 {{left_sidebar_enabled,right_sidebar_enabled=False,False}}
 {{extend 'layout.html'}}
-{{thead = THEAD(TR(TH(T("Title")), TH(T("Subtitles")), TH(T("Slides/content"))))}}
+
 {{trows=[]}}
-{{for video in videos:}}
-  {{trows.append(TR(TD(A(video.title, _href=URL(f="show", args=["video", video.id]))),
-  		            TD(A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))),
-  		            TD(A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id])), " / ",
+{{if auth.is_logged_in():}}
+  {{thead = THEAD(TR(TH(T("Title")), TH(T("Subtitles")), TH(T("Slides/content"))))}}
+  {{for video in videos:}}
+    {{trows.append(TR(TD(A(video.title, _href=URL(f="show", args=["video", video.id]))),
+                    TD(A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))),
+                    TD(A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id])), " / ",
                        A(T("Add slides"), _href=URL(f="slide", args=["video", video.id])), " / ",
                        A(T("Edit entry"), _href=URL(f="video", args=["update", video.id])))))}}
-{{trows.append(TR(TD(IMG(_src=URL(f="download", args=["image", video.thumbnail]), _width="100px")), TD(T("Abstract"), ":", BR(), video.abstract), _colspan=2))}}
+    {{trows.append(TR(TD(IMG(_src=URL(f="download", args=["image", video.thumbnail]), _width="100px")), TD(T("Abstract"), ":", BR(), video.abstract), _colspan=2))}}
+  {{pass}}
+{{else:}}
+  {{thead = THEAD(TR(TH(), TH()))}}
+  {{for video in videos:}}
+    {{trows.append(TR(TD(IMG(_src=URL(f="download", args=["image", video.thumbnail]), _width="100px")), TD(A(video.title, _href=URL(f="show", args=["video", video.id])), BR(), video.abstract)))}}
+  {{pass}}
 {{pass}}
 {{tbody=TBODY(*trows)}}
 {{=TABLE(thead, tbody)}}

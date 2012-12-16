@@ -13,8 +13,8 @@ default_options = {"language": LANGUAGE, "timeout": 3}
 
 def authorize(table, record_id):
     myrecord = db[table][record_id]
-    if not ((myrecord.user_id != auth.user_id) or (auth.has_membership(role="manager"))):
-        raise HTTP(403, T("The requeste action could not be performed. You must own the record or be in the managers list"), lazy=False)
+    if not ((myrecord.user_id == auth.user_id) or (auth.has_membership(role="manager"))):
+        raise HTTP(403, T("The requested action could not be performed. You must own the record or be in the managers list"), lazy=False)
 
 if auth.is_logged_in():
     if not session.options:
@@ -299,9 +299,6 @@ def setup():
 def subtitle():
     from gluon.contrib import simplejson
     T.lazy = False
-    if request.args(1) in ["delete", "update"]:
-        subtitulation = db.subtitulation[request.vars.subtitulation_id]
-        authorize("subtitulation", subtitulation.id)
         
     if request.args(1) == "create":
         starts = seconds_to_time(request.vars.starts)
@@ -322,7 +319,8 @@ def subtitle():
         def update_record(sub):
             del(sub["startEvent"])
             del(sub["endEvent"])
-            authorize("subtitle", sub["id"])
+            subtitulation_id = db.subtitle[sub["id"]].subtitulation_id
+            authorize("subtitulation", subtitulation_id)
             db.subtitle[sub["id"]].update_record(**sub)
 
         payload = simplejson.loads(request.vars.data)
@@ -335,7 +333,8 @@ def subtitle():
             raise HTTP(500, "Unexpected data format")
         return simplejson.dumps("Done!")
     elif request.args(1) == "delete":
-        authorize("subtitle", request.vars.id)
+        subtitulation_id = db.subtitle[request.vars.id].subtitulation_id
+        authorize("subtitulation", subtitulation_id)
         result = db.subtitle[request.vars.id].delete_record()
         return simplejson.dumps("ok")
     else:
@@ -372,7 +371,8 @@ def slide():
             def update_record(myslide):
                 del(myslide["startEvent"])
                 del(myslide["endEvent"])
-                authorize("slide", myslide["id"])                
+                presentation_id = db.slide[myslide["id"]].presentation_id
+                authorize("presentation", presentation_id)
                 db.slide[myslide["id"]].update_record(**myslide)
     
             payload = simplejson.loads(request.vars.data)
@@ -385,7 +385,8 @@ def slide():
                 raise HTTP(500, "Unexpected data format")
             return simplejson.dumps(T("Done!"))
         elif request.args(1) == "delete":
-            authorize("slide", request.vars.id)
+            presentation_id = db.slide[request.vars.id].presentation_id
+            authorize("presentation", presentation_id)
             result = db.slide[request.vars.id].delete_record()
             return simplejson.dumps(T("Done!"))
         else:

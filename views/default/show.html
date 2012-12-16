@@ -7,10 +7,13 @@
 {{else:}}
   {{our_subtitles="null"}}
 {{pass}}
+{{if auth.is_logged_in():}}
 {{=A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))}} /
 {{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}} /
 {{=A(T("Edit entry"), _href=URL(f="video", args=["update", video.id]))}}
-
+{{else:}}
+{{=A(T("Login to edit slides and subtitles"), _href=URL(f="user", args=["login"], vars={"_next":request.url}))}}
+{{pass}}
 
 {{if video.service=="youtube":}}
   {{video_div=DIV(_id="video")}}
@@ -33,7 +36,7 @@
 {{pass}}
 
 {{=TABLE(TR(TD(video_div), TD(slides_ul)), TR(TD(subtitles_div), TD()), _class="show")}}
-
+{{=HR()}}
 {{=form}}
 
 {{=SCRIPT("""
