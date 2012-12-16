@@ -2,7 +2,8 @@
 {{extend 'layout.html'}}
 
 {{=H5(video.title)}}
-
+{{=A(T("Show video"), _href=URL(f="show", args=["video", video.id]))}} ({{=T("Remember to save changes first!")}}) / 
+{{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}}
 {{=FORM(DIV(INPUT(_type="button", _value=T("Back"),
                   _id="step_back"),
              INPUT(_type="button", _value=T("Pause/Play"),
@@ -306,4 +307,3 @@ jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
               _id="apply")}}
 
 {{end}}
-

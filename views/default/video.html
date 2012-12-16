@@ -1,0 +1,8 @@
+{{extend 'layout.html'}}
+{{=H3(T("Add/Edit a video"))}}
+{{if video_id is not None:}}
+  {{=HR()}}
+  {{=A(T("Edit multiple sources"), _href=URL(f="sources", args=["video", video_id]))}} / 
+  {{=A(T("Show video"), _href=URL(f="show", args=["video", video_id]))}}
+{{pass}}
+{{=form}}

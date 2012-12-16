@@ -1,0 +1,13 @@
+{{extend 'layout.html'}}
+{{if action == "update":}}
+  {{=H3(T("Edit video source"))}}
+  {{=A(T("New video source") % dict(name=video.title), _href=URL(f="sources", args=["video", video.id]))}} / 
+{{else:}}
+  {{=H3(T("New video source"))}}
+{{pass}}
+{{=A(T("Edit video %(name)s") % dict(name=video.title), _href=URL(f="video", args=["update", video.id]))}} / {{=A(T("Create a new video"), _href=URL(f="video"))}}
+{{=form}}
+{{if sources:}}
+  {{=HR()}}
+  {{=SQLTABLE(sources)}}
+{{pass}}

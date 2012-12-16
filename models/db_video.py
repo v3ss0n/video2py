@@ -68,7 +68,7 @@ db.define_table("slide",
                       comment=T("For retrieving the content remotely from a third party service")),
                 Field("itself", "upload", label=T("File"),
                       comment=T("Stores a slide locally")),
-                Field("code", comment=T("Slide index or other type label for identifying the slide")),
+                Field("code", comment=T("Slide index or other type of label for identifying the slide")),
                 Field("template", "boolean", default=False,
                       readable=False, writable=False,
                       comment=T("Used as content reference for common slides")),
@@ -198,4 +198,3 @@ def seconds_to_time(seconds):
     except ValueError:
         msc = 0
     return datetime.time(hours, minutes, seconds, microseconds)
-

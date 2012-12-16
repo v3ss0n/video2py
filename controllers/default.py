@@ -15,6 +15,10 @@ if auth.is_logged_in() and (not session.options):
         session.options = USER_OPTIONS.as_dict()
     else:
         session.options = {"language": None, "timeout": 3}
+        db.option.insert(user_id=auth.user_id, language=None, timeout=3)
+elif (not session.options):
+    session.options = {"language": None, "timeout": 3}
+    
 
 if request.function in ["show", "subtitles", "slides"]:
     response.files.append(URL(c='static', f="js/popcorn_complete.js"))
@@ -55,6 +59,7 @@ def index():
 @auth.requires_login()
 def slides():
     mylanguage = session.options["language"]
+    if not mylanguage: response.flash = T("No language selected! Please visit the Setup page")
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
 
@@ -112,6 +117,9 @@ def slides():
 
 @auth.requires_login()
 def subtitles():
+    mylanguage = session.options["language"]
+    if not mylanguage: response.flash = T("No language selected! Please visit the Setup page")    
+
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
 
@@ -122,9 +130,8 @@ def subtitles():
 
     sq = db.subtitulation.user_id == auth.user_id
     sq &= db.subtitulation.video_id == request.args(1)
-    sq &= db.subtitulation.language == session.options["language"]
+    sq &= db.subtitulation.language == mylanguage
     subtitulation = db(sq).select().first()
-    mylanguage = session.options["language"]
 
     if subtitulation is None:
         subtitulation_id = db.subtitulation.insert(user_id=auth.user_id,
@@ -164,15 +171,18 @@ def subtitles():
                 subtitulation=subtitulation_id, ioform=ioform)
 
 def show():
-    subtitles = None
+    subtitles = slides = None
     language = session.options["language"]
     video = db.video[request.args(1)]
     sources = db(db.source.video_id==request.args(1)).select()
     subtitulation = db((db.subtitulation.video_id==request.args(1))&(db.subtitulation.language==session.options["language"])).select().first()
     if subtitulation:
         subtitles = db(db.subtitle.subtitulation_id==subtitulation.id).select()
+        
     presentation = db((db.presentation.language==language)&(db.presentation.video_id==video.id)).select().first()
-    slides = None
+    if not presentation:
+        # Default to the first presentation submitted
+        presentation = db(db.presentation.video_id==video.id).select().first()    
     if presentation:
         slides = db((db.slide.presentation_id==presentation.id)&(db.slide.template==False)).select()
     return dict(video=video, sources=sources, subtitles=subtitles, slides=slides)
@@ -260,7 +270,7 @@ def setup():
 
 @auth.requires_login()
 def subtitle():
-    import simplejson
+    from gluon.contrib import simplejson
     T.lazy = False
     if request.args(1) == "create":
         starts = seconds_to_time(request.vars.starts)
@@ -302,7 +312,7 @@ def subtitle():
 @auth.requires_login()
 def slide():
     if request.extension == "json":
-        import simplejson
+        from gluon.contrib import simplejson
         T.lazy = False
         if request.args(1) == "create":
             starts = seconds_to_time(request.vars.starts)
@@ -367,3 +377,29 @@ def slide():
         slides = db((db.slide.presentation_id==presentation_id)&(db.slide.template==True)).select()
         return dict(video=video, sources=sources, slides=slides, form=form)
 
+@auth.requires_login()
+def video():
+    action = request.args(0)
+    video_id = request.args(1)
+    db.video.user_id.writable = False
+    if action == "update":
+        form = crud.update(db.video, video_id)
+    else:
+        form = crud.create(db.video)
+    return dict(form=form, video_id=video_id)
+
+@auth.requires_login()
+def sources():
+    video = db.video[request.args(1)]
+    action = request.args(3)
+    source_id = request.args(5)
+    if (action == "update") and source_id:
+        form = crud.update(db.source, source_id)
+    else:
+        db.source.video_id.default = video.id
+        form = crud.create(db.source)
+    db.source.id.represent = lambda field, row: A(T("Edit"),
+                                                _href=URL(f="sources", \
+args=["video", video.id,"action", "update", "source", field]))
+    sources = db(db.source.video_id==video.id).select()
+    return dict(form=form, sources=sources, video=video, action=action)

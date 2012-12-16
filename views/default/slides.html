@@ -2,7 +2,8 @@
 {{extend 'layout.html'}}
 
 {{=H5(video.title)}}
-
+{{=A(T("Show video"), _href=URL(f="show", args=["video", video.id]))}} ({{=T("Remember to save changes first!")}}) / 
+{{=A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))}}
 {{=FORM(DIV(INPUT(_type="button", _value=T("Back"),
                   _id="step_back"),
              INPUT(_type="button", _value=T("Pause/Play"),
@@ -333,7 +334,7 @@ jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
         INPUT(_type="button", _value=T("Apply all changes"),
               _id="slide_apply"))}}
 
-{{=SELECT(*[OPTION("%(starts)s - %(ends)s" % dict(starts=sub.starts, ends=sub.ends), _value=sub.id) for sub in slides], _multiple="multiple", _id="slides")}}
+{{=SELECT(*[OPTION("%(starts)s - %(ends)s" % dict(starts=slide.starts, ends=slide.ends), _value=slide.id) for slide in slides], _multiple="multiple", _id="slides")}}
 
 {{=ioform.custom.begin}}
 {{=LABEL(T("Slide"))}}{{=BR()}}
@@ -346,4 +347,3 @@ jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
 {{=INPUT(_type="button", _value=T("Apply"),
               _id="apply")}} {{=SPAN(" ", " ", A(T("Add slides"), _href=URL(f="slide", args=["video", video.id])))}}
 {{end}}
-

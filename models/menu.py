@@ -24,7 +24,8 @@ response.google_analytics_id = None
 
 response.menu = [
     (T('Home'), False, URL('default','index'), []),
-    (T('Setup'), False, URL('default','setup'), [])
+    (T('Setup'), False, URL('default','setup'), []),
+    (T('Add new video'), False, URL('default','video'), []),
     ]
 
 #########################################################################
@@ -100,4 +101,3 @@ def _():
                 ]
          )]
 _()
-

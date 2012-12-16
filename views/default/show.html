@@ -8,7 +8,9 @@
   {{our_subtitles="null"}}
 {{pass}}
 {{=A(T("Edit subtitles"), _href=URL(f="subtitles", args=["video", video.id]))}} /
-{{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}}  
+{{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}} /
+{{=A(T("Edit entry"), _href=URL(f="video", args=["update", video.id]))}}
+
 
 {{if video.service=="youtube":}}
   {{video_div=DIV(_id="video")}}
