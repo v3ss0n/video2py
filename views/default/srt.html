@@ -1,0 +1,13 @@
+{{extend 'layout.html'}}
+{{=P(video.title)}}
+{{=H5(T("Srt file import"))}}
+{{=A(T("Back to the subtitles page"),
+       _href=URL(f="subtitles",
+                 args=["video",
+                       subtitulation.video_id]))}}
+{{=form}}
+{{if errors:}}
+  {{=HR()}}
+  {{=H5(T("Import errors"))}}
+  {{=UL(*[LI(error) for error in errors])}}
+{{pass}}
