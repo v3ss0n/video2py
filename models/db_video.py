@@ -239,5 +239,6 @@ def export_to_srt(subtitulation):
         sri.index = i
         mysrt.append(sri)
     mysrt.write_into(sio)
+    sio.seek(0)
     return sio
-    
+

@@ -469,7 +469,6 @@ dict(inserted=result["inserted"], removed=result["removed"], errors=len(result["
                     video=video, errors=errors)
     elif do == "export":
         sio = export_to_srt(subtitulation)
-        sio.seek(0)
         filename = "%(title)s_%(language)s.srt" % dict(title=video.title, language=subtitulation.language)
         return response.stream(sio, attachment=True, filename=filename.replace(" ", ""))
     else:
