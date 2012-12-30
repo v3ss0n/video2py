@@ -442,3 +442,36 @@ def sources():
 args=["video", video.id,"action", "update", "source", field]))
     sources = db(db.source.video_id==video.id).select()
     return dict(form=form, sources=sources, video=video, action=action)
+
+@auth.requires_login()
+def srt():
+    do = request.args(1)
+    which = request.args(3)
+    errors = None
+    # TODO: the user should own the subtitulation or else be a manager
+    subtitulation = db.subtitulation[int(which)]
+    video = db.video[subtitulation.video_id]
+    if do == "import":
+        response.view = "default/srt.html"
+        form = SQLFORM.factory(Field("source", "upload", uploadfield=False,
+                                     requires=IS_NOT_EMPTY()),
+                               Field("overwrite", "boolean",
+                                     default=True,
+                                     comment=T("Unselect to append to current subtitles")))
+        if form.process().accepted:
+            result = import_from_srt(subtitulation, request.vars)
+            response.flash = T("%(inserted)s records inserted. %(removed)s records removed. Error count: %(errors)s.") % \
+dict(inserted=result["inserted"], removed=result["removed"], errors=len(result["errors"]))
+            if len(result["errors"]) > 0:
+                errors = result["errors"]
+        return dict(form=form,
+                    subtitulation=subtitulation,
+                    video=video, errors=errors)
+    elif do == "export":
+        sio = export_to_srt(subtitulation)
+        sio.seek(0)
+        filename = "%(title)s_%(language)s.srt" % dict(title=video.title, language=subtitulation.language)
+        return response.stream(sio, attachment=True, filename=filename.replace(" ", ""))
+    else:
+        raise HTTP(501, T("The %s option is not implemented.") % do)
+

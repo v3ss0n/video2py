@@ -2,8 +2,21 @@
 {{extend 'layout.html'}}
 
 {{=H5(video.title)}}
-{{=A(T("Show video"), _href=URL(f="show", args=["video", video.id]))}} ({{=T("Remember to save changes first!")}}) / 
-{{=A(T("Edit slides"), _href=URL(f="slides", args=["video", video.id]))}}
+{{=A(T("Show video"),
+     _href=URL(f="show",
+               args=["video", video.id]))}}
+({{=T("Remember to save changes first!")}}) / 
+{{=A(T("Edit slides"), _href=URL(f="slides",
+                                 args=["video", video.id]))}}
+{{if subtitulation:}}
+  / {{=A(T("Import subtitles"),
+         _href=URL(f="srt",
+                   args=["do", "import", "which", subtitulation]))}}
+  / {{=A(T("Export subtitles"),
+           _href=URL(f="srt",
+           args=["do", "export", "which", subtitulation]))}}
+{{pass}}
+
 {{=FORM(DIV(INPUT(_type="button", _value=T("Back"),
                   _id="step_back"),
              INPUT(_type="button", _value=T("Pause/Play"),
@@ -15,7 +28,8 @@
 
 {{if video.service=="youtube":}}
   {{=DIV(_id="video", _class="subtitles")}}
-  {{pop='Popcorn.youtube("%(id)s", "http://www.youtube.com/watch?v=%(code)s");' % dict(id="video", code=video.code)}}
+  {{pop='Popcorn.youtube("%(id)s", "http://www.youtube.com/watch?v=%(code)s");' % \
+dict(id="video", code=video.code)}}
 {{else:}}
   {{=DIV(VIDEO(*[SOURCE(_src=source.url) for source in sources],
                _id="ourvideo"),
@@ -175,7 +189,9 @@ function submitSubtitles(id){
     var payload = getSubtitle(id);
   }
   else {var payload = ourSubtitles;}
-  jQuery.post("%(url)s" + "/update", {data: JSON.stringify(payload)}, submitSubtitlesCallback);
+  jQuery.post("%(url)s" + "/update",
+              {data: JSON.stringify(payload)},
+              submitSubtitlesCallback);
 }
 
 function stepForward(){
@@ -290,7 +306,10 @@ jQuery(document).keyup(function(e){if(e.ctrlKey){holDown = false;} });
         INPUT(_type="button", _value=T("Apply all changes"),
               _id="subtitle_apply"))}}
 
-{{=SELECT(*[OPTION("%(starts)s - %(ends)s" % dict(starts=sub.starts, ends=sub.ends), _value=sub.id) for sub in subtitles], _multiple="multiple", _id="subtitles")}}
+{{=SELECT(*[OPTION("%(starts)s - %(ends)s" % dict(starts=sub.starts,
+                                                  ends=sub.ends),
+                                                  _value=sub.id) \
+for sub in subtitles], _multiple="multiple", _id="subtitles")}}
 
 {{=ioform.custom.begin}}
 

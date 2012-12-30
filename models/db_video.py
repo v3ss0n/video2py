@@ -198,3 +198,46 @@ def seconds_to_time(seconds):
     except ValueError:
         msc = 0
     return datetime.time(hours, minutes, seconds, microseconds)
+
+def import_from_srt(subtitulation, vars):
+    import pysrt
+    import StringIO
+    # Create the srt object
+    mysrt = pysrt.SubRipFile()
+    mysrt.read(vars.source.file)
+    result = dict(removed=0, inserted=0, errors=[])
+    if vars.overwrite:
+        # Delete any existent subtitle
+        result["removed"] = db(db.subtitle.subtitulation_id==subtitulation.id).count()
+        db(db.subtitle.subtitulation_id==subtitulation.id).delete()
+    for subtitle in mysrt:
+        body = subtitle.text
+        try:
+            starts = subtitle.start.to_time()
+            ends = subtitle.end.to_time()
+        except ValueError:
+            result["errors"].append(T("Invalid time input: %(start)s - %(end)s", lazy=False) % \
+                dict(start=subtitle.start, end=subtitle.end))
+        db.subtitle.insert(subtitulation_id=subtitulation.id,
+                           body=body,
+                           starts=starts,
+                           ends=ends)
+        result["inserted"] += 1
+    return result
+
+def export_to_srt(subtitulation):
+    subtitles = db(db.subtitle.subtitulation_id==subtitulation.id).select(orderby=db.subtitle.starts)
+    import pysrt
+    import StringIO
+    sio = StringIO.StringIO()
+    mysrt = pysrt.SubRipFile()
+    for i, subtitle in enumerate(subtitles):
+        sri = pysrt.SubRipItem()
+        sri.text = subtitle.body
+        sri.start = pysrt.SubRipTime.from_time(subtitle.starts)
+        sri.end = pysrt.SubRipTime.from_time(subtitle.ends)
+        sri.index = i
+        mysrt.append(sri)
+    mysrt.write_into(sio)
+    return sio
+    
