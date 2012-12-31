@@ -461,7 +461,9 @@ def srt():
         if form.process().accepted:
             result = import_from_srt(subtitulation, request.vars)
             response.flash = T("%(inserted)s records inserted. %(removed)s records removed. Error count: %(errors)s.") % \
-dict(inserted=result["inserted"], removed=result["removed"], errors=len(result["errors"]))
+                dict(inserted=result["inserted"],
+                     removed=result["removed"],
+                     errors=len(result["errors"]))
             if len(result["errors"]) > 0:
                 errors = result["errors"]
         return dict(form=form,
@@ -469,8 +471,15 @@ dict(inserted=result["inserted"], removed=result["removed"], errors=len(result["
                     video=video, errors=errors)
     elif do == "export":
         sio = export_to_srt(subtitulation)
-        filename = "%(title)s_%(language)s.srt" % dict(title=video.title, language=subtitulation.language)
-        return response.stream(sio, attachment=True, filename=filename.replace(" ", ""))
+        filename = "%(title)s_%(language)s.srt" % \
+            dict(title=video.title,
+                 language=subtitulation.language)
+        filename = filename.replace(" ", "")
+        response.headers["Content-Type"] = "text/plain; charset=%s" % ENCODING
+        response.headers["Content-Disposition"] = 'attachment; filename="%s"' % filename
+        return sio.read()
+        # .stream is not working for .srt files (rocket raises a unicode error)
+        # return response.stream(sio, attachment=True, filename=filename)
     else:
         raise HTTP(501, T("The %s option is not implemented.") % do)
 

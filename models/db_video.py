@@ -2,11 +2,10 @@
 
 LANGUAGES = {"es": T("Spanish")  ,"en": T("English"), "it": T("Italian")}
 LANGUAGE = "es"
-
+ENCODING = "utf-8"
 CONTENTS = {"image": T("image"), "video": T("video"),
             "flash": T("flash"), "html": T("html"),
             "markmin": T("markmin")}
-
 SERVICES = {"static":T("HTML5/local"), "youtube":T("Youtu.be"), "vimeo": T("Vimeo")}
 
 db.define_table("option",
@@ -203,8 +202,11 @@ def import_from_srt(subtitulation, vars):
     import pysrt
     import StringIO
     # Create the srt object
-    mysrt = pysrt.SubRipFile()
-    mysrt.read(vars.source.file)
+    mysrt = pysrt.SubRipFile(encoding=ENCODING)
+    srtinput = [unicode(line, ENCODING) for line in \
+                vars.source.file.read().splitlines()]
+    # mysrt.read(vars.source.file)
+    mysrt.read(srtinput)
     result = dict(removed=0, inserted=0, errors=[])
     if vars.overwrite:
         # Delete any existent subtitle
@@ -230,10 +232,13 @@ def export_to_srt(subtitulation):
     import pysrt
     import StringIO
     sio = StringIO.StringIO()
-    mysrt = pysrt.SubRipFile()
+    mysrt = pysrt.SubRipFile(encoding=ENCODING)
     for i, subtitle in enumerate(subtitles):
         sri = pysrt.SubRipItem()
-        sri.text = subtitle.body
+        if isinstance(subtitle.body, unicode):
+            sri.text = subtitle.body
+        else:
+            sri.text = unicode(subtitle.body, ENCODING)
         sri.start = pysrt.SubRipTime.from_time(subtitle.starts)
         sri.end = pysrt.SubRipTime.from_time(subtitle.ends)
         sri.index = i
