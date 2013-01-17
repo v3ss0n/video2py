@@ -236,8 +236,10 @@ def export_to_srt(subtitulation):
     for i, subtitle in enumerate(subtitles):
         sri = pysrt.SubRipItem()
         if isinstance(subtitle.body, unicode):
+            print "is unicode"
             sri.text = subtitle.body
         else:
+            print "is not unicode"
             sri.text = unicode(subtitle.body, ENCODING)
         sri.start = pysrt.SubRipTime.from_time(subtitle.starts)
         sri.end = pysrt.SubRipTime.from_time(subtitle.ends)

@@ -149,7 +149,7 @@
       <div class="sixteen columns">
         {{block footer}} <!-- this is default footer -->
         <div class="footer-content clearfix">
-          <div class="copyright">{{=T('Copyright')}} &#169; 2011</div>
+          <div class="copyright">{{=T('Copyright')}} {{=SPAN(XML("&#169;"), " 2013 Mariano Reingart")}} {{=". "}} {{=SPAN("Source code available at the ", A("project page", _href="http://code.google.com/p/video2py"), " (Released under ", A("GPLv3", _href="http://www.gnu.org/licenses/gpl.html"), ")")}}</div>
           <div style="float: right;">
             <a href="http://www.web2py.com/">
             <img style="padding-bottom: 0;" src="{{=URL('static','images/poweredby.png')}}"/>
